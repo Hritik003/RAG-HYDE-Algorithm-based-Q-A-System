@@ -29,3 +29,11 @@ kaggle.api.dataset_download_files('rajneesh231/lex-fridman-podcast-transcript', 
 
 ```
 
+## Data Loading
+
+**2.1 Load the dataset**
+
+```python
+df=pd.read_csv('podcastdata_dataset.csv)
+```
+
