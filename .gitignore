@@ -1,1 +1,6 @@
 /rag_env
+/passages_index.faiss
+/passages.tsv
+/passages_dataset/data-00000-of-00001.arrow
+/passages_dataset/dataset_info.json
+/passages_dataset/state.json
