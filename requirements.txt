@@ -5,3 +5,6 @@ datasets
 streamlit 
 gradio
 kaggle
+faiss-cpu
+sentence-transformers
+
