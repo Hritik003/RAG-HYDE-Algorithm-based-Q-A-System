@@ -1,0 +1,7 @@
+torch 
+tensorflow 
+transformers 
+datasets 
+streamlit 
+gradio
+kaggle
