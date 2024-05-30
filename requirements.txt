@@ -1,7 +1,9 @@
-torch 
+torch
 tensorflow 
 transformers 
 datasets 
 streamlit 
 gradio
 kaggle
+llama-index-embeddings-openai
+langchain
