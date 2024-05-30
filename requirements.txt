@@ -7,3 +7,11 @@ gradio
 kaggle
 llama-index-embeddings-openai
 langchain
+langchain-community
+einops
+sentence_transformers
+llama-index-embeddings-itrex
+intel-extension-for-transformers 
+accelerate 
+onnx
+llama-index-llms-openai
