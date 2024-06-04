@@ -19,3 +19,6 @@ grpcio==1.60.0
 llama_index.vector_stores.qdrant
 llama_index.core
 llama-index-vector-stores-chroma
+llama_index.llms.huggingface
+llama_index.core.prompts.prompts
+chromadb
