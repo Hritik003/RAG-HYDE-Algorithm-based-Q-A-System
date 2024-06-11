@@ -3,7 +3,43 @@ import os
 import subprocess
 from HyDE_Implementation import generate_final_prompt
 from vector_space_creation import create_vector_embeddings
+import urllib.request
 
+import streamlit as st
+
+page_bg_img = """
+<style>
+.bg-img-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("https://enterprise.press/wp-content/uploads/2023/02/Lex-Fridman-1600x.jpg");
+  background-size: cover;
+  opacity: 0.5; /* Adjust the opacity here */
+  z-index: -1; /* Ensure the image is behind other content */
+}
+</style>
+"""
+
+st.markdown(page_bg_img, unsafe_allow_html=True)
+st.markdown('<div class="bg-img-container"></div>', unsafe_allow_html=True)
+
+# Set the Streamlit app background color to transparent
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: transparent;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+st.markdown(page_bg_img, unsafe_allow_html=True)
 def run_vector_space_creation(chunk_size, overlap_size):
     # Pass chunk_size and overlap_size as environment variables
     env = os.environ.copy()
@@ -16,8 +52,6 @@ def run_vector_space_creation(chunk_size, overlap_size):
 
 
 def main():
-    st.set_page_config(page_title="Llama 2 Chatbot", page_icon="🐑")
-
     # Initialize session state variables if they do not exist
     if "api_key" not in st.session_state:
         st.session_state.api_key = ""
@@ -39,7 +73,7 @@ def main():
         st.session_state.overlap_size = 50
 
     if st.session_state.step == 1:
-        st.markdown("# 🐑 Llama 2 Chatbot")
+        st.markdown("# Lex Fridman Podcast based Answering System")
         st.markdown("## Enter your OpenAI API Key")
         api_key = st.text_input("API Key", type="password")
         if st.button("Submit"):
@@ -123,5 +157,6 @@ def main():
         if user_input:
             # Add your code to handle user input and generate responses using the Llama2 model
             st.write("Response: This is a placeholder for the chatbot's response.")
+
 if __name__ == "__main__":
     main()
