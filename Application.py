@@ -1,162 +1,71 @@
-import streamlit as st
-import os
-import subprocess
-from HyDE_Implementation import generate_final_prompt
-from vector_space_creation import create_vector_embeddings
-import urllib.request
+import pandas as pd
+import openai
+import numpy as np
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
-import streamlit as st
+def retrieve_top_k_documents(prompt_vector, vector_database, k=5):
+    chunk_vectors = [item[3] for item in vector_database]
+    similarities = cosine_similarity([prompt_vector], chunk_vectors)[0]
+    top_k_indices = np.argsort(similarities)[::-1][:k]
+    return top_k_indices
 
-page_bg_img = """
-<style>
-.bg-img-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-image: url("https://enterprise.press/wp-content/uploads/2023/02/Lex-Fridman-1600x.jpg");
-  background-size: cover;
-  opacity: 0.5; /* Adjust the opacity here */
-  z-index: -1; /* Ensure the image is behind other content */
-}
-</style>
-"""
+openai.api_base = "http://localhost:1234/v1"
+openai.api_key = "lm-studio"
 
-st.markdown(page_bg_img, unsafe_allow_html=True)
-st.markdown('<div class="bg-img-container"></div>', unsafe_allow_html=True)
+def create_chat_completion(history):
+    return openai.ChatCompletion.create(
+        model="TheBloke/Llama-2-7B-Chat-GGUF",
+        messages=history,
+        temperature=0.7,
+        stream=True,
+    )
 
-# Set the Streamlit app background color to transparent
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-color: transparent;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+def better_prompt_generation(user_prompt):
+    model_input = "Original prompt: " + user_prompt + "\n\n" + "How can we enrich this question to provide more context and depth?\n\n" + "Just give me your version of the prompt and nothing else!"
+    
+    system_message = (
+        "You are an expert writer. Your task is to enhance the given prompt by adding more context and depth, without altering the original tone."
+    )
 
+    history = [
+        {"role": "system", "content": system_message},
+        {"role": "user", "content": model_input},
+    ]
 
-st.markdown(page_bg_img, unsafe_allow_html=True)
-def run_vector_space_creation(chunk_size, overlap_size):
-    # Pass chunk_size and overlap_size as environment variables
-    env = os.environ.copy()
-    env["CHUNK_SIZE"] = str(chunk_size)
-    env["OVERLAP_SIZE"] = str(overlap_size)
+    completion = create_chat_completion(history)
+    new_message = {"role": "assistant", "content": ""}
 
-    # Run the vector_space_creation.py script
-    result = subprocess.run(["python", "vector_space_creation.py"], capture_output=True, text=True, env=env)
-    return result.returncode == 0 and os.path.exists("vector_embeddings.csv")
+    for chunk in completion:
+        if 'content' in chunk.choices[0].delta:
+            new_message["content"] += chunk.choices[0].delta.content
 
+    if new_message["content"]:
+        history.append(new_message)
 
-def main():
-    # Initialize session state variables if they do not exist
-    if "api_key" not in st.session_state:
-        st.session_state.api_key = ""
-    if "step" not in st.session_state:
-        st.session_state.step = 1
-    if "temperature" not in st.session_state:
-        st.session_state.temperature = 0.1
-    if "top_p" not in st.session_state:
-        st.session_state.top_p = 0.9
-    if "max_length" not in st.session_state:
-        st.session_state.max_length = 120
-    if "model_ready" not in st.session_state:
-        st.session_state.model_ready = False
-    if "vector_space_created" not in st.session_state:
-        st.session_state.vector_space_created = False
-    if "chunk_size" not in st.session_state:
-        st.session_state.chunk_size = 512
-    if "overlap_size" not in st.session_state:
-        st.session_state.overlap_size = 50
+    return new_message["content"]
 
-    if st.session_state.step == 1:
-        st.markdown("# Lex Fridman Podcast based Answering System")
-        st.markdown("## Enter your OpenAI API Key")
-        api_key = st.text_input("API Key", type="password")
-        if st.button("Submit"):
-            st.session_state.api_key = api_key
-            st.rerun()  # Reload the page to update the state
+def generate_final_prompt(user_prompt, vector_database_path='vector_embeddings.csv'):
+    model_name_or_path = "bert-base-nli-mean-tokens"
+    model = SentenceTransformer(model_name_or_path)
+    output_prompt_vector = model.encode(better_prompt_generation(user_prompt))
+    
+    ve = pd.read_csv(vector_database_path)
+    chunks_with_similarity_indices = []
 
-        if st.session_state.api_key and not st.session_state.vector_space_created:
-            st.markdown("## Set Chunk and Overlap Size")
-            chunk_size = st.slider(
-                "Chunk Size",
-                min_value=128,
-                max_value=1024,
-                value=st.session_state.chunk_size,
-                step=64
-            )
-            overlap_size = st.slider(
-                "Overlap Size",
-                min_value=0,
-                max_value=256,
-                value=st.session_state.overlap_size,
-                step=16
-            )
-            create_vector_placeholder = st.empty()  # Placeholder for "Create Vector Space" button
-            if create_vector_placeholder.button("Create Vector Space"):
-                create_vector_placeholder.empty()  # Remove the button and associated text
-                create_vector_embeddings(chunk_size, overlap_size)
-                if run_vector_space_creation(chunk_size, overlap_size):
-                    st.session_state.vector_space_created = True
-                    st.session_state.step = 2
-                    st.rerun()
-                else:
-                    st.error("Failed to create vector space. Please try again.")
+    for index, row in ve.iterrows():
+        vector = np.fromstring(row['chunk_vector'][1:-1], sep=' ')
+        similarity = cosine_similarity(vector.reshape(1, -1), output_prompt_vector.reshape(1, -1))
+        chunks_with_similarity_indices.append([similarity[0][0], row['chunk'], row['guest'], row['title']])
 
-    elif st.session_state.step == 2:
-        st.markdown("# Vector Space Successfully Created 🎉🎉🎉")
-        st.markdown("## Set the hyperparameters of your model") 
+    chunks_with_similarity_indices.sort(reverse=True)
+    chunks_with_similarity_indices = chunks_with_similarity_indices[:6]
 
-        temperature = st.slider(
-            "Temperature",
-            min_value=0.01,
-            max_value=1.0,
-            value=st.session_state.temperature,
-            step=0.01
-        )
+    final_prompt = user_prompt + "\n\nAbove is the user prompt\n\n" + better_prompt_generation(user_prompt) + "\n\n Above is a better version of the prompt\n\n" "Below are the related chunks of data : \n\n"
+    
+    for i in chunks_with_similarity_indices:
+        final_prompt +=  i[1] + "\n\n"
 
-        top_p = st.slider(
-            "Top_p",
-            min_value=0.01,
-            max_value=1.0,
-            value=st.session_state.top_p,
-            step=0.01
-        )
-
-        max_length = st.slider(
-            "Max_length",
-            min_value=32,
-            max_value=128,
-            value=st.session_state.max_length,
-            step=1
-        )
-
-        if st.button("Set Hyperparameters"):
-            st.session_state.temperature = temperature
-            st.session_state.top_p = top_p
-            st.session_state.max_length = max_length
-            st.session_state.model_ready = True
-            st.session_state.step = 3
-            st.rerun()
-
-    elif st.session_state.step == 3:
-        st.markdown("## Your model is ready to use 🎉🎉🎉!")
-        st.header("Models and parameters")
-        st.write(f"Temperature: {st.session_state.temperature}")
-        st.write(f"Top_p: {st.session_state.top_p}")
-        st.write(f"Max_length: {st.session_state.max_length}")
-
-        st.markdown("## How may I assist you today?")
-        user_input = st.text_input("Your message", "")
-        final_prompt = generate_final_prompt(user_input)
-        st.write(final_prompt)
-        if user_input:
-            # Add your code to handle user input and generate responses using the Llama2 model
-            st.write("Response: This is a placeholder for the chatbot's response.")
-
-if __name__ == "__main__":
-    main()
+    final_prompt += "\n\n" + "Based on the input prompt, output prompt and the relevant chunks of data, answer the input prompt"
+    
+    return final_prompt 
